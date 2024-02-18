@@ -265,10 +265,25 @@ void SlamGMapping::init()
 
 }
 
+void SlamGMapping::PredictposeCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
+{
+  predict_pose_.header.stamp = ros::Time::now();
+  predict_pose_.header.frame_id = "map";  
+  predict_pose_.pose.position.x = msg->pose.position.x;
+  predict_pose_.pose.position.y = msg->pose.position.y;
+  predict_pose_.pose.position.z = 0.0;
+  predict_pose_.pose.orientation.x = 0.0;
+  predict_pose_.pose.orientation.y = 0.0;
+  predict_pose_.pose.orientation.z = msg->pose.orientation.z;
+  predict_pose_.pose.orientation.w = msg->pose.orientation.w;
+}
 
 void SlamGMapping::startLiveSlam()
 {
+  predict_pose_.pose.position.z = 10;
   entropy_publisher_ = private_nh_.advertise<std_msgs::Float64>("entropy", 1, true);
+  last_pose_pub_ = node_.advertise<geometry_msgs::PoseStamped>("last_pose", 1, true);
+  predict_pose_sub_ = node_.subscribe("predict_pose", 1, &SlamGMapping::PredictposeCallback, this);
   sst_ = node_.advertise<nav_msgs::OccupancyGrid>("map", 1, true);
   sstm_ = node_.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
   ss_ = node_.advertiseService("dynamic_map", &SlamGMapping::mapCallback, this);
@@ -548,11 +563,23 @@ SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
 }
 
 bool
-SlamGMapping::addScan(const sensor_msgs::LaserScan& scan, GMapping::OrientedPoint& gmap_pose)
+SlamGMapping::addScan(const sensor_msgs::LaserScan& scan, GMapping::OrientedPoint& gmap_pose, GMapping::OrientedPoint& last_mpose)
 {
   if(!getOdomPose(gmap_pose, scan.header.stamp))
      return false;
-  
+
+  if(predict_pose_.pose.position.z != 10)
+  {
+    geometry_msgs::Quaternion quaternion = predict_pose_.pose.orientation;
+    tf2::Quaternion tf2_quaternion;
+    tf2::fromMsg(quaternion, tf2_quaternion);
+    double roll, pitch, yaw;
+    tf2::Matrix3x3(tf2_quaternion).getRPY(roll, pitch, yaw);
+    gmap_pose = GMapping::OrientedPoint(predict_pose_.pose.position.x,
+                                        predict_pose_.pose.position.y,
+                                        yaw);
+  }
+
   if(scan.ranges.size() != gsp_laser_beam_count_)
     return false;
 
@@ -603,7 +630,7 @@ SlamGMapping::addScan(const sensor_msgs::LaserScan& scan, GMapping::OrientedPoin
             */
   ROS_DEBUG("processing scan");
 
-  return gsp_->processScan(reading);
+  return gsp_->processScan(reading, 0, last_mpose);
 }
 
 void
@@ -624,8 +651,8 @@ SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
   }
 
   GMapping::OrientedPoint odom_pose;
-
-  if(addScan(*scan, odom_pose))
+  GMapping::OrientedPoint last_mpose;
+  if(addScan(*scan, odom_pose, last_mpose))
   {
     ROS_DEBUG("scan processed");
 
@@ -649,6 +676,20 @@ SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
     }
   } else
     ROS_DEBUG("cannot process scan");
+  tf2::Quaternion quaternion;
+  quaternion.setRPY(0.0, 0.0, last_mpose.theta);
+  geometry_msgs::Quaternion quaternion_msg = tf2::toMsg(quaternion);
+  geometry_msgs::PoseStamped last_pose;
+  last_pose.header.stamp = ros::Time::now();
+  last_pose.header.frame_id = "map";  
+  last_pose.pose.position.x = last_mpose.x;
+  last_pose.pose.position.y = last_mpose.y;
+  last_pose.pose.position.z = 0.0;
+  last_pose.pose.orientation.x = 0.0;
+  last_pose.pose.orientation.y = 0.0;
+  last_pose.pose.orientation.z = quaternion_msg.z;
+  last_pose.pose.orientation.w = quaternion_msg.w;
+  last_pose_pub_.publish(last_pose);
 }
 
 double

@@ -37,6 +37,9 @@
 #include "tf/transform_broadcaster.h"
 #include "message_filters/subscriber.h"
 #include "tf/message_filter.h"
+#include "geometry_msgs/PoseStamped.h"
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 
 #include "gmapping/gridfastslam/gridslamprocessor.h"
 #include "gmapping/sensor/sensor_base/sensor.h"
@@ -53,6 +56,7 @@ class SlamGMapping
 
     void init();
     void startLiveSlam();
+    void PredictposeCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
     void startReplay(const std::string & bag_fname, std::string scan_topic);
     void publishTransform();
   
@@ -64,6 +68,9 @@ class SlamGMapping
   private:
     ros::NodeHandle node_;
     ros::Publisher entropy_publisher_;
+    ros::Publisher last_pose_pub_;
+    ros::Subscriber predict_pose_sub_;
+    geometry_msgs::PoseStamped predict_pose_;
     ros::Publisher sst_;
     ros::Publisher sstm_;
     ros::ServiceServer ss_;
@@ -108,7 +115,7 @@ class SlamGMapping
     void updateMap(const sensor_msgs::LaserScan& scan);
     bool getOdomPose(GMapping::OrientedPoint& gmap_pose, const ros::Time& t);
     bool initMapper(const sensor_msgs::LaserScan& scan);
-    bool addScan(const sensor_msgs::LaserScan& scan, GMapping::OrientedPoint& gmap_pose);
+    bool addScan(const sensor_msgs::LaserScan& scan, GMapping::OrientedPoint& gmap_pose, GMapping::OrientedPoint& last_mpose);
     double computePoseEntropy();
     
     // Parameters used by GMapping
