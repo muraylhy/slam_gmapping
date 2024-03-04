@@ -3,19 +3,20 @@ import numpy as np
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 
-data = pd.read_csv('./test.csv')
-
+data = pd.read_csv('/home/drl03/catkin_songcan/src/slam_gmapping/temp_yaw.csv')
+# data['temp_imu_w'] = data['temp_imu_w'] * 3.1415926 / 180.0
 x_data = data['odom_w'].values
 y_data = data['yaw_angle'].values
 
 mean_value = np.mean(y_data)
 std_dev = np.std(y_data)
-outlier_threshold = std_dev
+outlier_threshold = 3 * std_dev
 
 cleaned_indices = np.abs(y_data - mean_value) < outlier_threshold
 x_data_cleaned = x_data[cleaned_indices]
 y_data_cleaned = y_data[cleaned_indices]
-
+# x_data_cleaned = x_data
+# y_data_cleaned = y_data
 # 定义拟合函数
 def linear_function(x, slope, intercept):
     return slope * x + intercept

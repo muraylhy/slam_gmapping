@@ -37,11 +37,12 @@ class DataSubscribe():
 
         qua = [self.last_ori_w, 0.0, 0.0, self.last_ori_z]
         last_yaw = tf_euler.quat2euler(qua, axes='sxyz')[2]
-        input_data = torch.tensor([self.odom_v, self.odom_w, last_yaw], dtype=torch.float32)
+        input_data = torch.tensor([self.odom_fusion_v, self.odom_fusion_w, last_yaw], dtype=torch.float32)
         with torch.no_grad():
             predicted_output = self.model(input_data)
 
-        next_yaw = last_yaw + 0.10986180859410012 * self.odom_fusion_w + -0.00021583319259198483
+        next_yaw = last_yaw + 0.09839830205101541 * self.odom_fusion_w
+        # next_yaw = last_yaw + 0.10927975861673422 * self.odom_w + -0.0001377448141874914
         quaternion = tf_euler.euler2quat(0.0, 0.0, next_yaw)
         pose_stamped_msg = PoseStamped()
         pose_stamped_msg.header.stamp = rospy.Time.now()
@@ -87,6 +88,18 @@ class DataSubscribe():
     def odom_fusion_callback(self, odom_msg:Odometry):
         self.odom_fusion_v = odom_msg.twist.twist.linear.x
         self.odom_fusion_w = odom_msg.twist.twist.angular.z
+
+        # pose_stamped_msg = PoseStamped()
+        # pose_stamped_msg.header.stamp = rospy.Time.now()
+        # pose_stamped_msg.header.frame_id = 'map'
+        # pose_stamped_msg.pose.position.x = odom_msg.pose.pose.position.x
+        # pose_stamped_msg.pose.position.y = odom_msg.pose.pose.position.y
+        # pose_stamped_msg.pose.position.z = 0.0
+        # pose_stamped_msg.pose.orientation.x = 0.0
+        # pose_stamped_msg.pose.orientation.y = 0.0
+        # pose_stamped_msg.pose.orientation.z = odom_msg.pose.pose.orientation.z
+        # pose_stamped_msg.pose.orientation.w = odom_msg.pose.pose.orientation.w
+        # self.predict_pub.publish(pose_stamped_msg)
 
 if __name__ == "__main__":
     rospy.init_node('predict')

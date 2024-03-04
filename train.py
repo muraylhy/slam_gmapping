@@ -13,23 +13,24 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 
 # 读取CSV文件
-data = pd.read_csv('amcl_and_odom_data0.csv')
-# data = pd.read_csv('test.csv')
+data = pd.read_csv('amcl_odom_data.csv')
 
-z_values = data['amcl_ori_z'].tolist()
-w_values = data['amcl_ori_w'].tolist()
+# z_values = data['amcl_ori_z'].tolist()
+# w_values = data['amcl_ori_w'].tolist()
+z_values = data['odom_fusion_z'].tolist()
+w_values = data['odom_fusion_ori_w'].tolist()
 quaternions = list(zip(w_values, [0.0] * len(z_values), [0.0] * len(z_values), z_values))
 yaw_angles = [tf_euler.quat2euler(q, axes='sxyz')[2] for q in quaternions]
 data['yaw_angle'] = yaw_angles
 
 # 提取特征和标签
-features = data[['odom_v', 'odom_w', 'yaw_angle']].iloc[:-1].values
+features = data[['odom_fusion_v', 'odom_fusion_w', 'yaw_angle']].iloc[:-1].values
 # features = data[['odom_w']].values
 
 data['delta_x'] = data['amcl_pos_x'].diff()
 data['delta_y'] = data['amcl_pos_y'].diff()
 data['delta_yaw'] = data['yaw_angle'].diff()
-labels = data[['delta_x', 'delta_y']].iloc[1:].values
+labels = data[['delta_x', 'delta_y', 'delta_yaw']].iloc[1:].values
 # labels = data[['yaw_angle']].values
 
 # 划分训练集和测试集
@@ -44,7 +45,7 @@ y_test_tensor = torch.tensor(y_test, dtype=torch.float32)
 # 初始化模型
 input_size = 3  # 输入特征的数量
 hidden_size = 128  # 隐藏层的神经元数量
-output_size = 2  # 输出的位姿数量
+output_size = 3  # 输出的位姿数量
 model = PosePredictionModel(input_size, hidden_size, output_size)
 
 # 定义损失函数和优化器
